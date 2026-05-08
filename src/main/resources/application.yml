@@ -1,0 +1,9 @@
+server:
+  port: 8080
+
+aliyun:
+  dataworks:
+    access-key-id: ${DATAWORKS_ACCESS_KEY_ID:}
+    access-key-secret: ${DATAWORKS_ACCESS_KEY_SECRET:}
+    region-id: ${DATAWORKS_REGION_ID:cn-shanghai}
+    endpoint: ${DATAWORKS_ENDPOINT:dataworks.cn-shanghai.aliyuncs.com}
