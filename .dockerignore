@@ -1,0 +1,26 @@
+# Build outputs
+target/
+
+# IDE / editor
+.idea/
+*.iml
+.vscode/
+
+# VCS
+.git/
+.gitignore
+
+# OS files
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Local env / temp
+.env
+*.tmp
+*.swp
+
+# Docs not needed at runtime image build
+docs/

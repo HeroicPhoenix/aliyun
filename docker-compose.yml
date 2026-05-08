@@ -1,0 +1,17 @@
+services:
+  aliyun:
+    image: aliyun:latest
+    container_name: aliyun
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "${JAVA_OPTS:--Xms256m -Xmx512m}"
+      LOG_PATH: logs
+      DATAWORKS_ACCESS_KEY_ID: "${DATAWORKS_ACCESS_KEY_ID:?DATAWORKS_ACCESS_KEY_ID is required}"
+      DATAWORKS_ACCESS_KEY_SECRET: "${DATAWORKS_ACCESS_KEY_SECRET:?DATAWORKS_ACCESS_KEY_SECRET is required}"
+      DATAWORKS_REGION_ID: "${DATAWORKS_REGION_ID:-cn-shanghai}"
+      DATAWORKS_ENDPOINT: "${DATAWORKS_ENDPOINT:-dataworks.cn-shanghai.aliyuncs.com}"
+    volumes:
+      - ./logs:/opt/aliyun/logs
