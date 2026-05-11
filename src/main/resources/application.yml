@@ -7,3 +7,5 @@ aliyun:
     access-key-secret: ${DATAWORKS_ACCESS_KEY_SECRET:}
     region-id: ${DATAWORKS_REGION_ID:cn-shanghai}
     endpoint: ${DATAWORKS_ENDPOINT:dataworks.cn-shanghai.aliyuncs.com}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}

@@ -61,6 +61,11 @@
             <artifactId>dataworks_public20200518</artifactId>
             <version>8.0.4</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>3.7.2</version>
+        </dependency>
     </dependencies>
 
     <build>
