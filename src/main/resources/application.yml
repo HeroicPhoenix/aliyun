@@ -10,3 +10,8 @@ aliyun:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
     operation-timeout-ms: ${KAFKA_OPERATION_TIMEOUT_MS:5000}
+  maxcompute:
+    access-key-id: ${MAXCOMPUTE_ACCESS_KEY_ID:}
+    access-key-secret: ${MAXCOMPUTE_ACCESS_KEY_SECRET:}
+    endpoint: ${MAXCOMPUTE_ENDPOINT:http://service.cn-shanghai.maxcompute.aliyun.com/api}
+    export-dir: ${MAXCOMPUTE_EXPORT_DIR:/opt/aliyun/export/maxcompute}
