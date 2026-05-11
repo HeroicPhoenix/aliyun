@@ -12,11 +12,24 @@ public class KafkaProperties {
      */
     private String bootstrapServers;
 
+    /**
+     * Kafka单次操作超时时间，单位毫秒
+     */
+    private Integer operationTimeoutMs = 5000;
+
     public String getBootstrapServers() {
         return bootstrapServers;
     }
 
     public void setBootstrapServers(String bootstrapServers) {
         this.bootstrapServers = bootstrapServers;
+    }
+
+    public Integer getOperationTimeoutMs() {
+        return operationTimeoutMs;
+    }
+
+    public void setOperationTimeoutMs(Integer operationTimeoutMs) {
+        this.operationTimeoutMs = operationTimeoutMs;
     }
 }
