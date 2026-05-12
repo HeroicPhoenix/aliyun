@@ -25,4 +25,4 @@ services:
       DATAHUB_OPERATION_TIMEOUT_MS: "${DATAHUB_OPERATION_TIMEOUT_MS:-5000}"
     volumes:
       - ./logs:/opt/aliyun/logs
-      - ${MAXCOMPUTE_HOST_EXPORT_DIR:-./export/maxcompute}:${MAXCOMPUTE_EXPORT_DIR:-/opt/aliyun/export/maxcompute}
+      - ./export/maxcompute:${MAXCOMPUTE_EXPORT_DIR}
