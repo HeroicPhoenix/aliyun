@@ -8,8 +8,15 @@ aliyun:
     region-id: ${DATAWORKS_REGION_ID:cn-shanghai}
     endpoint: ${DATAWORKS_ENDPOINT:dataworks.cn-shanghai.aliyuncs.com}
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:127.0.0.1:9092}
-    operation-timeout-ms: ${KAFKA_OPERATION_TIMEOUT_MS:5000}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:dh-cn-shanghai.aliyuncs.com:9092}
+    operation-timeout-ms: ${KAFKA_OPERATION_TIMEOUT_MS:10000}
+    datahub-compatible-enabled: ${KAFKA_DATAHUB_COMPATIBLE_ENABLED:true}
+    jaas-config-path: ${KAFKA_JAAS_CONFIG_PATH:/Users/mack/Documents/file/kafka_client_producer_jaas.conf}
+    truststore-enabled: ${KAFKA_TRUSTSTORE_ENABLED:false}
+    truststore-location: ${KAFKA_TRUSTSTORE_LOCATION:/file/client.truststore.jks}
+    truststore-password: ${KAFKA_TRUSTSTORE_PASSWORD:123456}
+    ssl-endpoint-identification-algorithm: ""
+    compression-type: ${KAFKA_COMPRESSION_TYPE:lz4}
   maxcompute:
     access-key-id: ${MAXCOMPUTE_ACCESS_KEY_ID:}
     access-key-secret: ${MAXCOMPUTE_ACCESS_KEY_SECRET:}

@@ -1,8 +1,15 @@
 package com.lvwyh.aliyun.datahub.service.impl;
 
 import com.aliyun.datahub.client.DatahubClient;
+import com.aliyun.datahub.client.model.ConnectorType;
+import com.aliyun.datahub.client.model.CreateConnectorResult;
+import com.aliyun.datahub.client.model.CreateTopicResult;
 import com.aliyun.datahub.client.model.CursorType;
+import com.aliyun.datahub.client.model.DeleteConnectorResult;
+import com.aliyun.datahub.client.model.DeleteTopicResult;
+import com.aliyun.datahub.client.model.ExpandMode;
 import com.aliyun.datahub.client.model.Field;
+import com.aliyun.datahub.client.model.FieldType;
 import com.aliyun.datahub.client.model.GetCursorResult;
 import com.aliyun.datahub.client.model.GetRecordsResult;
 import com.aliyun.datahub.client.model.GetTopicResult;
@@ -13,11 +20,14 @@ import com.aliyun.datahub.client.model.RecordEntry;
 import com.aliyun.datahub.client.model.RecordSchema;
 import com.aliyun.datahub.client.model.RecordType;
 import com.aliyun.datahub.client.model.ShardEntry;
+import com.aliyun.datahub.client.model.SinkOdpsConfig;
 import com.aliyun.datahub.client.model.TupleRecordData;
 import com.lvwyh.aliyun.api.common.exception.BusinessException;
+import com.lvwyh.aliyun.datahub.ao.CreateDataHubConnectorAO;
 import com.lvwyh.aliyun.datahub.config.DataHubProperties;
 import com.lvwyh.aliyun.datahub.service.DataHubTestService;
 import com.lvwyh.aliyun.datahub.vo.DataHubFieldVO;
+import com.lvwyh.aliyun.datahub.vo.DataHubOperationVO;
 import com.lvwyh.aliyun.datahub.vo.DataHubPutRecordVO;
 import com.lvwyh.aliyun.datahub.vo.DataHubRecordVO;
 import com.lvwyh.aliyun.datahub.vo.DataHubRecordsVO;
@@ -27,6 +37,7 @@ import com.lvwyh.aliyun.datahub.vo.DataHubTopicVO;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
@@ -82,6 +93,77 @@ public class DataHubTestServiceImpl implements DataHubTestService {
         } catch (Exception e) {
             log.error("Get DataHub topic failed: projectName={}, topicName={}", projectName, topicName, e);
             throw new BusinessException("查询DataHub Topic详情失败", e);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DataHubOperationVO createTopic(String projectName, String topicName, Integer shardCount, Integer lifeCycle,
+                                          String recordType, String comment, Boolean shardExtendEnabled) {
+        validateConfig();
+        try {
+            RecordType finalRecordType = RecordType.valueOf(recordType);
+            ExpandMode expandMode = getExpandMode(shardExtendEnabled);
+            RecordSchema schema = RecordType.TUPLE.equals(finalRecordType) ? buildDefaultTupleRecordSchema() : null;
+            CreateTopicResult result = datahubClient.createTopic(projectName, topicName, shardCount, lifeCycle,
+                    finalRecordType, schema, comment, expandMode);
+            return new DataHubOperationVO(projectName, topicName, null, result.getRequestId());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Create DataHub topic failed: projectName={}, topicName={}, recordType={}, shardCount={}, shardExtendEnabled={}",
+                    projectName, topicName, recordType, shardCount, shardExtendEnabled, e);
+            throw new BusinessException("创建DataHub Topic失败", e);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DataHubOperationVO deleteTopic(String projectName, String topicName) {
+        validateConfig();
+        try {
+            DeleteTopicResult result = datahubClient.deleteTopic(projectName, topicName);
+            return new DataHubOperationVO(projectName, topicName, null, result.getRequestId());
+        } catch (Exception e) {
+            log.error("Delete DataHub topic failed: projectName={}, topicName={}", projectName, topicName, e);
+            throw new BusinessException("删除DataHub Topic失败", e);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DataHubOperationVO createConnector(CreateDataHubConnectorAO ao) {
+        validateConfig();
+        try {
+            SinkOdpsConfig config = buildSinkOdpsConfig(ao);
+            CreateConnectorResult result = datahubClient.createConnector(
+                    ao.getProjectName(),
+                    ao.getTopicName(),
+                    ConnectorType.SINK_ODPS,
+                    ao.getColumnFields(),
+                    config
+            );
+            return new DataHubOperationVO(ao.getProjectName(), ao.getTopicName(), result.getConnectorId(), result.getRequestId());
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Create DataHub ODPS sink connector failed: projectName={}, topicName={}, odpsProject={}, odpsTable={}",
+                    ao.getProjectName(), ao.getTopicName(), ao.getOdpsProject(), ao.getOdpsTable(), e);
+            throw new BusinessException("创建DataHub同步链路失败", e);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DataHubOperationVO deleteConnector(String projectName, String topicName) {
+        validateConfig();
+        try {
+            DeleteConnectorResult result = datahubClient.deleteConnector(projectName, topicName, ConnectorType.SINK_ODPS);
+            return new DataHubOperationVO(projectName, topicName, ConnectorType.SINK_ODPS.name(), result.getRequestId());
+        } catch (Exception e) {
+            log.error("Delete DataHub ODPS sink connector failed: projectName={}, topicName={}",
+                    projectName, topicName, e);
+            throw new BusinessException("删除DataHub同步链路失败", e);
         }
     }
 
@@ -168,6 +250,31 @@ public class DataHubTestServiceImpl implements DataHubTestService {
             ));
         }
         return fields;
+    }
+
+    private RecordSchema buildDefaultTupleRecordSchema() {
+        RecordSchema schema = new RecordSchema();
+        schema.addField(new Field("data_value", FieldType.STRING));
+        return schema;
+    }
+
+    private ExpandMode getExpandMode(Boolean shardExtendEnabled) {
+        return Boolean.TRUE.equals(shardExtendEnabled) ? ExpandMode.ONLY_EXTEND : ExpandMode.ONLY_SPLIT;
+    }
+
+    private SinkOdpsConfig buildSinkOdpsConfig(CreateDataHubConnectorAO ao) {
+        SinkOdpsConfig config = new SinkOdpsConfig();
+        config.setEndpoint(ao.getOdpsEndpoint());
+        config.setProject(ao.getOdpsProject());
+        config.setTable(ao.getOdpsTable());
+        config.setAccessId(StringUtils.hasText(ao.getOdpsAccessId()) ? ao.getOdpsAccessId() : properties.getAccessKeyId());
+        config.setAccessKey(StringUtils.hasText(ao.getOdpsAccessKey()) ? ao.getOdpsAccessKey() : properties.getAccessKeySecret());
+        config.setPartitionMode(SinkOdpsConfig.PartitionMode.SYSTEM_TIME);
+        config.setTimeRange(ao.getTimeRangeMinutes());
+        SinkOdpsConfig.PartitionConfig partitionConfig = new SinkOdpsConfig.PartitionConfig();
+        partitionConfig.addConfig(ao.getPartitionField(), ao.getPartitionFormat());
+        config.setPartitionConfig(partitionConfig);
+        return config;
     }
 
     private List<DataHubShardVO> convertShards(List<ShardEntry> shards) {

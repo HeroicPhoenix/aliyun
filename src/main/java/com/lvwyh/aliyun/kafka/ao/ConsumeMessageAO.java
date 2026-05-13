@@ -11,7 +11,7 @@ import java.io.Serializable;
     @Schema(description = "Kafka消费消息入参")
     public class ConsumeMessageAO implements Serializable {
 
-    @Schema(description = "Topic名称", example = "test-topic", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Topic名称", example = "demo_project.demo_topic", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "topic不能为空")
     private String topic;
 

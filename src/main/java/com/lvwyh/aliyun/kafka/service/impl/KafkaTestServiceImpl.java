@@ -20,6 +20,8 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.config.SaslConfigs;
+import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.errors.TopicExistsException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -28,6 +30,7 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,6 +45,8 @@ public class KafkaTestServiceImpl implements KafkaTestService {
 
     private static final Logger log = LogManager.getLogger(KafkaTestServiceImpl.class);
 
+    private static final String DEFAULT_API_TIMEOUT_MS_CONFIG = "default.api.timeout.ms";
+
     private final KafkaProperties kafkaProperties;
 
     public KafkaTestServiceImpl(KafkaProperties kafkaProperties) {
@@ -55,8 +60,9 @@ public class KafkaTestServiceImpl implements KafkaTestService {
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrap);
         props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, operationTimeoutMs);
-        props.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, operationTimeoutMs);
+        props.put(DEFAULT_API_TIMEOUT_MS_CONFIG, operationTimeoutMs);
         props.put(AdminClientConfig.RETRIES_CONFIG, 0);
+        applyDataHubCompatibleProperties(props);
 
         try (AdminClient adminClient = AdminClient.create(props)) {
             NewTopic newTopic = new NewTopic(topic, partitions, replicationFactor);
@@ -93,6 +99,11 @@ public class KafkaTestServiceImpl implements KafkaTestService {
         props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, operationTimeoutMs);
         props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, operationTimeoutMs);
         props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, operationTimeoutMs);
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, "false");
+        if (StringUtils.hasText(kafkaProperties.getCompressionType())) {
+            props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, kafkaProperties.getCompressionType());
+        }
+        applyDataHubCompatibleProperties(props);
 
         try (KafkaProducer<String, String> producer = new KafkaProducer<String, String>(props)) {
             ProducerRecord<String, String> record = new ProducerRecord<String, String>(topic, key, message);
@@ -118,7 +129,10 @@ public class KafkaTestServiceImpl implements KafkaTestService {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, autoOffsetReset);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, operationTimeoutMs);
-        props.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, operationTimeoutMs);
+        props.put(DEFAULT_API_TIMEOUT_MS_CONFIG, operationTimeoutMs);
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "60000");
+        props.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, "40000");
+        applyDataHubCompatibleProperties(props);
 
         List<KafkaMessageVO> messages = new ArrayList<KafkaMessageVO>();
         long deadline = System.currentTimeMillis() + timeoutMs;
@@ -160,5 +174,65 @@ public class KafkaTestServiceImpl implements KafkaTestService {
             return 5000;
         }
         return kafkaProperties.getOperationTimeoutMs();
+    }
+
+    private void applyDataHubCompatibleProperties(Properties props) {
+        if (!Boolean.TRUE.equals(kafkaProperties.getDatahubCompatibleEnabled())) {
+            return;
+        }
+        props.put("security.protocol", "SASL_SSL");
+        props.put(SaslConfigs.SASL_MECHANISM, "PLAIN");
+        applyJaasConfig(props);
+        if (kafkaProperties.getSslEndpointIdentificationAlgorithm() != null) {
+            props.put(SslConfigs.SSL_ENDPOINT_IDENTIFICATION_ALGORITHM_CONFIG,
+                    kafkaProperties.getSslEndpointIdentificationAlgorithm());
+        }
+        applyTruststoreProperties(props);
+    }
+
+    private void applyJaasConfig(Properties props) {
+        if (StringUtils.hasText(kafkaProperties.getJaasConfigPath())) {
+            validateReadableFile(kafkaProperties.getJaasConfigPath(), "DataHub Kafka JAAS配置文件不存在或不可读");
+            System.setProperty("java.security.auth.login.config", kafkaProperties.getJaasConfigPath());
+            return;
+        }
+        if (!StringUtils.hasText(kafkaProperties.getAccessKeyId())) {
+            throw new BusinessException("DataHub Kafka accessKeyId未配置");
+        }
+        if (!StringUtils.hasText(kafkaProperties.getAccessKeySecret())) {
+            throw new BusinessException("DataHub Kafka accessKeySecret未配置");
+        }
+        props.put(SaslConfigs.SASL_JAAS_CONFIG,
+                "org.apache.kafka.common.security.plain.PlainLoginModule required username=\""
+                        + escapeJaasValue(kafkaProperties.getAccessKeyId())
+                        + "\" password=\""
+                        + escapeJaasValue(kafkaProperties.getAccessKeySecret())
+                        + "\";");
+    }
+
+    private void applyTruststoreProperties(Properties props) {
+        if (!Boolean.TRUE.equals(kafkaProperties.getTruststoreEnabled())) {
+            return;
+        }
+        if (!StringUtils.hasText(kafkaProperties.getTruststoreLocation())) {
+            throw new BusinessException("DataHub Kafka truststoreLocation未配置");
+        }
+        if (!StringUtils.hasText(kafkaProperties.getTruststorePassword())) {
+            throw new BusinessException("DataHub Kafka truststorePassword未配置");
+        }
+        validateReadableFile(kafkaProperties.getTruststoreLocation(), "DataHub Kafka truststore文件不存在或不可读");
+        props.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, kafkaProperties.getTruststoreLocation());
+        props.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, kafkaProperties.getTruststorePassword());
+    }
+
+    private void validateReadableFile(String path, String message) {
+        File file = new File(path);
+        if (!file.isFile() || !file.canRead()) {
+            throw new BusinessException(message + ": " + path);
+        }
+    }
+
+    private String escapeJaasValue(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
