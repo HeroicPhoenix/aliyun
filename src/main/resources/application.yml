@@ -7,6 +7,11 @@ aliyun:
     access-key-secret: ${DATAWORKS_ACCESS_KEY_SECRET:}
     region-id: ${DATAWORKS_REGION_ID:cn-shanghai}
     endpoint: ${DATAWORKS_ENDPOINT:dataworks.cn-shanghai.aliyuncs.com}
+  swagger-security:
+    enabled: ${SWAGGER_SECURITY_ENABLED:true}
+    username: ${SWAGGER_USERNAME:admin}
+    password: ${SWAGGER_PASSWORD:admin}
+    allowed-ips: ${SWAGGER_ALLOWED_IPS:127.0.0.1,::1}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:dh-cn-shanghai.aliyuncs.com:9092}
     operation-timeout-ms: ${KAFKA_OPERATION_TIMEOUT_MS:10000}
